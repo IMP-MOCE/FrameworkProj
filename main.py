@@ -3,7 +3,6 @@
 from datetime import date, timedelta
 
 
-# Демонстрационные данные одного занятия и одного пользователя.
 workshop_name = "Роспись керамической кружки"
 master_name = "Анна Смирнова"
 workshop_date = date.today() + timedelta(days=7)
