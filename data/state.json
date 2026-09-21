@@ -1,0 +1,8 @@
+{
+  "workshops": [
+    {"id": 1, "name": "Роспись керамической кружки", "master": "Анна Смирнова", "date": "2026-10-10", "price": 1500.0, "capacity": 3, "minimum_age": 12},
+    {"id": 2, "name": "Акварельный пейзаж", "master": "Иван Петров", "date": "2026-10-11", "price": 1200.0, "capacity": 5, "minimum_age": 10},
+    {"id": 3, "name": "Лепка из глины", "master": "Елена Волкова", "date": "2026-10-12", "price": 1800.0, "capacity": 4, "minimum_age": 14}
+  ],
+  "bookings": []
+}
