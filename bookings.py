@@ -1,59 +1,41 @@
-"""Проверка условий участия, создание и отмена записей."""
+"""Создание и поиск записей в коллекциях объектов."""
 
-from datetime import date
-
-from workshops import available_seats, get_workshop
+from models import Booking, User, Workshop
+from workshops import get_workshop
 
 
 def check_booking(
-    workshop: dict, bookings: list[dict], user_name: str, user_age: int,
+    workshop: Workshop, bookings: list[Booking], user_name: str, user_age: int,
 ) -> str:
-    """Вернуть причину отказа или пустую строку, если запись доступна."""
-    if not user_name.strip():
-        return "Имя не должно быть пустым."
-    if type(user_age) is not int or not 0 <= user_age <= 120:
-        return "Возраст должен быть целым числом от 0 до 120."
-    if user_age < workshop["minimum_age"]:
-        return f"Занятие доступно с {workshop['minimum_age']} лет."
-    if date.fromisoformat(workshop["date"]) < date.today():
-        return "Дата занятия уже прошла."
-    for booking in bookings:
-        if (
-            booking["workshop_id"] == workshop["id"]
-            and booking["status"] == "active"
-            and booking["user_name"].casefold() == user_name.strip().casefold()
-            and booking["user_age"] == user_age
-        ):
-            return "Этот участник уже записан на занятие."
-    if available_seats(workshop, bookings) <= 0:
-        return "Свободных мест нет."
-    return ""
+    """Вернуть причину отказа или пустую строку (сценарий ПР1)."""
+    try:
+        user = User(user_name, user_age)
+    except ValueError as error:
+        return str(error)
+    return workshop.check_booking(bookings, user)
 
 
 def create_booking(
-    workshops: list[dict], bookings: list[dict], workshop_id: int,
+    workshops: list[Workshop], bookings: list[Booking], workshop_id: int,
     user_name: str, user_age: int,
-) -> dict:
-    """Проверить условия и добавить активную запись с уникальным ID."""
+) -> Booking:
+    """Проверить доступность и добавить запись с уникальным ID."""
     workshop = get_workshop(workshops, workshop_id)
-    reason = check_booking(workshop, bookings, user_name, user_age)
+    user = User(user_name, user_age)
+    reason = workshop.check_booking(bookings, user)
     if reason:
         raise ValueError(reason)
-    booking = {
-        "id": max((item["id"] for item in bookings), default=0) + 1,
-        "workshop_id": workshop_id, "user_name": user_name.strip(),
-        "user_age": user_age, "status": "active",
-    }
+    booking = Booking(
+        max((item.id for item in bookings), default=0) + 1, workshop, user,
+    )
     bookings.append(booking)
     return booking
 
 
-def cancel_booking(bookings: list[dict], booking_id: int) -> dict:
-    """Отменить активную запись, сохранив её ID и данные в истории."""
+def cancel_booking(bookings: list[Booking], booking_id: int) -> Booking:
+    """Найти запись и отменить её методом объекта."""
     for booking in bookings:
-        if booking["id"] == booking_id:
-            if booking["status"] == "cancelled":
-                raise ValueError("Запись уже отменена.")
-            booking["status"] = "cancelled"
+        if booking.id == booking_id:
+            booking.cancel()
             return booking
     raise ValueError("Запись с таким ID не найдена.")

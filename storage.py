@@ -1,91 +1,115 @@
-"""Проверка целостности, загрузка и сохранение состояния в JSON."""
+"""Проверка целостности и хранение объектов в двух JSON-файлах."""
 
 import json
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Literal, TypedDict
 
-from workshops import available_seats, get_workshop, validate_workshop
+from models import Booking, Workshop
 
 
-def validate_state(state: dict) -> None:
-    """Отклонить повреждённые данные и несогласованные записи."""
-    if not isinstance(state, dict) or set(state) != {"workshops", "bookings"}:
-        raise ValueError("Ожидаются разделы workshops и bookings.")
-    if not all(isinstance(items, list) for items in state.values()):
-        raise ValueError("Занятия и записи должны храниться в списках.")
-    ids = set()
+class State(TypedDict):
+    """Коллекции объектов; общий контейнер не является сущностью."""
+
+    workshops: list[Workshop]
+    bookings: list[Booking]
+
+
+def validate_state(state: State) -> None:
+    """Проверить объекты, уникальность ID, связи и вместимость."""
+    ids = {}
     for workshop in state["workshops"]:
-        if not isinstance(workshop, dict):
-            raise ValueError("Занятие должно быть словарём.")
-        validate_workshop(workshop)
-        if workshop["id"] in ids:
+        if not isinstance(workshop, Workshop):
+            raise ValueError("Ожидается объект занятия.")
+        Workshop.from_data(workshop.to_data())
+        if workshop.id in ids:
             raise ValueError("Повторяется ID занятия.")
-        ids.add(workshop["id"])
+        ids[workshop.id] = workshop
     booking_ids = set()
     participants = set()
     for booking in state["bookings"]:
-        if not isinstance(booking, dict):
-            raise ValueError("Запись должна быть словарём.")
-        for key in ("id", "workshop_id", "user_age"):
-            if type(booking.get(key)) is not int:
-                raise ValueError(f"Поле записи {key} должно быть целым.")
-        if booking["id"] < 1 or booking["id"] in booking_ids:
-            raise ValueError("Некорректный или повторяющийся ID записи.")
-        booking_ids.add(booking["id"])
-        if booking["workshop_id"] not in ids:
-            raise ValueError("Запись ссылается на отсутствующее занятие.")
-        name = booking.get("user_name")
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("Не указано имя участника.")
-        if not 0 <= booking["user_age"] <= 120:
-            raise ValueError("Некорректный возраст участника.")
-        workshop = get_workshop(state["workshops"], booking["workshop_id"])
-        if booking["user_age"] < workshop["minimum_age"]:
-            raise ValueError("Возраст участника ниже ограничения занятия.")
-        if booking.get("status") not in ("active", "cancelled"):
-            raise ValueError("Некорректный статус записи.")
-        if booking["status"] == "active":
-            person = (
-                booking["workshop_id"], name.strip().casefold(),
-                booking["user_age"],
-            )
+        if not isinstance(booking, Booking):
+            raise ValueError("Ожидается объект записи.")
+        Booking.from_data(booking.to_data(), ids)
+        if ids.get(booking.workshop.id) is not booking.workshop:
+            raise ValueError("Запись должна ссылаться на объект из каталога.")
+        if booking.id in booking_ids:
+            raise ValueError("Повторяется ID записи.")
+        booking_ids.add(booking.id)
+        if booking.status == "active":
+            person = (booking.workshop.id, *booking.user.identity())
             if person in participants:
                 raise ValueError("Участник записан на занятие дважды.")
             participants.add(person)
     for workshop in state["workshops"]:
-        if available_seats(workshop, state["bookings"]) < 0:
+        if workshop.available_seats(state["bookings"]) < 0:
             raise ValueError("Число записей превышает вместимость занятия.")
 
 
-def load_state(filename: Path) -> dict:
-    """Прочитать JSON; отсутствие файла означает пустой новый каталог."""
+def read_items(filename: Path) -> list[dict]:
+    """Прочитать список JSON; отсутствующий файл означает пустой список."""
     try:
         with filename.open(encoding="utf-8") as stream:
-            state = json.load(stream)
+            items = json.load(stream)
     except FileNotFoundError:
-        return {"workshops": [], "bookings": []}
+        return []
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
-        raise ValueError(f"Не удалось прочитать JSON: {error}") from error
+        raise ValueError(f"Не удалось прочитать {filename.name}: {error}")
+    if not isinstance(items, list) or not all(
+        isinstance(item, dict) for item in items
+    ):
+        raise ValueError(f"{filename.name}: ожидается список объектов.")
+    return items
+
+
+def load_state(directory: Path) -> State:
+    """Сначала загрузить занятия, затем восстановить ссылки записей."""
+    workshops = [
+        Workshop.from_data(item)
+        for item in read_items(directory / "workshops.json")
+    ]
+    ids = {item.id: item for item in workshops}
+    bookings = [
+        Booking.from_data(item, ids)
+        for item in read_items(directory / "bookings.json")
+    ]
+    state: State = {"workshops": workshops, "bookings": bookings}
     validate_state(state)
     return state
 
 
-def save_state(filename: Path, state: dict) -> None:
-    """Атомарно заменить JSON; при ошибке оставить исходный файл."""
+def save_state(
+    directory: Path, state: State,
+    entity: Literal["workshops", "bookings"],
+) -> None:
+    """Проверить состояние и атомарно сохранить одну изменённую сущность.
+
+    Файл второй сущности должен совпадать с состоянием в памяти. Поэтому
+    отдельное сохранение не может создать несогласованную пару файлов.
+    """
+    if entity not in ("workshops", "bookings"):
+        raise ValueError("Неизвестная сущность.")
     validate_state(state)
-    filename.parent.mkdir(parents=True, exist_ok=True)
-    scratch = Path(__file__).resolve().parent / "мусор" / "runtime"
-    scratch.mkdir(parents=True, exist_ok=True)
+    other = "bookings" if entity == "workshops" else "workshops"
+    expected = [item.to_data() for item in state[other]]
+    if read_items(directory / f"{other}.json") != expected:
+        raise ValueError(
+            "Связанные данные изменились. Перезапустите программу.",
+        )
+    filename = directory / f"{entity}.json"
+    directory.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=scratch, delete=False,
-            suffix=".json",
+            mode="w", encoding="utf-8", dir=directory, delete=False,
+            prefix=f".{entity}-", suffix=".tmp",
         ) as stream:
             temporary = Path(stream.name)
-            json.dump(state, stream, ensure_ascii=False, indent=2,
-                      allow_nan=False)
+            json.dump(
+                [item.to_data() for item in state[entity]], stream,
+                ensure_ascii=False, indent=2, allow_nan=False,
+            )
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())

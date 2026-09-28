@@ -12,7 +12,7 @@ def test_create_booking_uses_one_seat(state):
     booking = create_booking(
         state["workshops"], state["bookings"], 1, "Аня", 12,
     )
-    assert booking["status"] == "active"
+    assert booking.status == "active"
     assert available_seats(state["workshops"][0], state["bookings"]) == 1
 
 
@@ -35,10 +35,10 @@ def test_duplicate_participant_forbidden(state):
 def test_cancel_frees_seat_and_keeps_history(state):
     create_booking(state["workshops"], state["bookings"], 1, "Аня", 18)
     cancel_booking(state["bookings"], 1)
-    assert state["bookings"][0]["status"] == "cancelled"
+    assert state["bookings"][0].status == "cancelled"
     assert available_seats(state["workshops"][0], state["bookings"]) == 2
     new = create_booking(state["workshops"], state["bookings"], 1, "Аня", 18)
-    assert new["id"] == 2
+    assert new.id == 2
     with pytest.raises(ValueError, match="уже отменена"):
         cancel_booking(state["bookings"], 1)
 
@@ -52,7 +52,7 @@ def test_invalid_participant_rejected(state, name, age):
 
 def test_past_date_rejected(state):
     workshop = state["workshops"][0]
-    workshop["date"] = (date.today() - timedelta(days=1)).isoformat()
+    workshop.date = (date.today() - timedelta(days=1))
     assert "прошла" in check_booking(workshop, [], "Аня", 18)
 
 

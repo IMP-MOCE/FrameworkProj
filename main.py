@@ -1,19 +1,19 @@
-"""Консольный сервис записи на творческие занятия, ПР2."""
+"""Консольный сервис записи на творческие занятия, ПР3."""
 
 from collections.abc import Iterable
 from copy import deepcopy
-from datetime import date
 from pathlib import Path
 
 from bookings import cancel_booking, check_booking, create_booking
-from storage import load_state, save_state
+from models import Booking, Workshop
+from storage import State, load_state, save_state
 from utils import confirm, input_date, input_int, input_price, input_text
 from workshops import (
     add_workshop, available_seats, filter_workshops, find_workshops,
     get_workshop, sort_workshops,
 )
 
-DATA_FILE = Path(__file__).resolve().parent / "data" / "state.json"
+DATA_DIR = Path(__file__).resolve().parent / "data"
 MENU = """
 === Сервис записи на творческие занятия ===
 1. Показать занятия
@@ -30,17 +30,17 @@ MENU = """
 """
 
 
-def show_workshop(workshop: dict, bookings: list[dict]) -> None:
+def show_workshop(workshop: Workshop, bookings: list[Booking]) -> None:
     """Показать занятие и актуальный остаток мест (сценарий ПР1)."""
-    day = date.fromisoformat(workshop["date"])
-    print(f"[{workshop['id']}] {workshop['name']}")
-    print(f"Мастер: {workshop['master']}; дата: {day:%d.%m.%Y}")
-    print(f"Стоимость: {workshop['price']:.2f} руб.")
+    day = workshop.date
+    print(f"[{workshop.id}] {workshop.name}")
+    print(f"Мастер: {workshop.master}; дата: {day:%d.%m.%Y}")
+    print(f"Стоимость: {workshop.price:.2f} руб.")
     print(f"Свободных мест: {available_seats(workshop, bookings)}")
-    print(f"Минимальный возраст: {workshop['minimum_age']} лет")
+    print(f"Минимальный возраст: {workshop.minimum_age} лет")
 
 
-def show_workshops(items: Iterable[dict], bookings: list[dict]) -> None:
+def show_workshops(items: Iterable[Workshop], bookings: list[Booking]) -> None:
     """Вывести список или генератор занятий."""
     found = False
     for workshop in items:
@@ -51,27 +51,21 @@ def show_workshops(items: Iterable[dict], bookings: list[dict]) -> None:
         print("Подходящих занятий нет.")
 
 
-def show_bookings(state: dict) -> None:
+def show_bookings(state: State) -> None:
     """Показать активные и отменённые записи с именами участников."""
     if not state["bookings"]:
         print("Записей пока нет.")
     for booking in state["bookings"]:
-        workshop = get_workshop(state["workshops"], booking["workshop_id"])
-        status = "активна" if booking["status"] == "active" else "отменена"
-        print(
-            f"[{booking['id']}] {booking['user_name']}, "
-            f"{booking['user_age']} лет — {workshop['name']}; "
-            f"{workshop['date']}; {status}"
-        )
+        print(booking)
 
 
-def select_workshop(state: dict) -> dict:
+def select_workshop(state: State) -> Workshop:
     """Получить ID и проверить существование занятия."""
     workshop_id = input_int("ID занятия: ", 1, 1_000_000_000)
     return get_workshop(state["workshops"], workshop_id)
 
 
-def booking_action(state: dict, filename: Path, create: bool) -> None:
+def booking_action(state: State, directory: Path, create: bool) -> None:
     """Проверить условия и при подтверждении сохранить новую запись."""
     workshop = select_workshop(state)
     show_workshop(workshop, state["bookings"])
@@ -81,7 +75,7 @@ def booking_action(state: dict, filename: Path, create: bool) -> None:
     if reason:
         print(f"Отказ: {reason}")
         return
-    print(f"Запись доступна. К оплате: {workshop['price']:.2f} руб.")
+    print(f"Запись доступна. К оплате: {workshop.price:.2f} руб.")
     if not create:
         return
     if not confirm("Подтвердить запись? (да/нет): "):
@@ -89,30 +83,30 @@ def booking_action(state: dict, filename: Path, create: bool) -> None:
         return
     candidate = deepcopy(state)
     booking = create_booking(
-        candidate["workshops"], candidate["bookings"], workshop["id"],
+        candidate["workshops"], candidate["bookings"], workshop.id,
         user_name, user_age,
     )
-    save_state(filename, candidate)
+    save_state(directory, candidate, "bookings")
     state.update(candidate)
-    print(f"Запись подтверждена. Номер записи: {booking['id']}.")
+    print(f"Запись подтверждена. Номер записи: {booking.id}.")
     print(f"Осталось мест: {available_seats(workshop, state['bookings'])}")
 
 
-def cancellation_action(state: dict, filename: Path) -> None:
+def cancellation_action(state: State, directory: Path) -> None:
     """Отменить запись после подтверждения и успешного сохранения."""
     booking_id = input_int("Номер записи: ", 1, 1_000_000_000)
     candidate = deepcopy(state)
     booking = cancel_booking(candidate["bookings"], booking_id)
-    print(f"Участник: {booking['user_name']}")
+    print(f"Участник: {booking.user.name}")
     if not confirm("Отменить запись? (да/нет): "):
         print("Отмена не выполнена.")
         return
-    save_state(filename, candidate)
+    save_state(directory, candidate, "bookings")
     state.update(candidate)
     print("Запись отменена. Место освобождено.")
 
 
-def addition_action(state: dict, filename: Path) -> None:
+def addition_action(state: State, directory: Path) -> None:
     """Ввести данные и сохранить новое занятие."""
     name = input_text("Название занятия: ")
     master = input_text("Имя мастера: ")
@@ -125,26 +119,27 @@ def addition_action(state: dict, filename: Path) -> None:
         candidate["workshops"], name, master, day, price, capacity,
         minimum_age,
     )
-    save_state(filename, candidate)
+    save_state(directory, candidate, "workshops")
     state.update(candidate)
-    print(f"Занятие добавлено. ID: {workshop['id']}.")
+    print(f"Занятие добавлено. ID: {workshop.id}.")
 
 
-def show_statistics(state: dict) -> None:
+def show_statistics(state: State) -> None:
     """Вывести число занятий, мастеров и записей по статусам."""
-    masters = {item["master"].casefold() for item in state["workshops"]}
-    active = sum(item["status"] == "active" for item in state["bookings"])
+    masters = {item.master.name.casefold() for item in state["workshops"]}
+    active = sum(item.status == "active" for item in state["bookings"])
     print(f"Занятий: {len(state['workshops'])}; мастеров: {len(masters)}")
     print(f"Активных записей: {active}")
     print(f"Отменённых записей: {len(state['bookings']) - active}")
 
 
-def main(filename: Path = DATA_FILE) -> None:
+def main(directory: Path = DATA_DIR) -> None:
     """Загрузить данные и повторять меню до команды выхода."""
     try:
-        if not filename.exists():
-            print("Файл данных отсутствует. Открыт пустой каталог.")
-        state = load_state(filename)
+        if not any((directory / name).exists() for name in
+                   ("workshops.json", "bookings.json")):
+            print("Файлы данных отсутствуют. Открыт пустой каталог.")
+        state = load_state(directory)
     except (OSError, ValueError) as error:
         print(f"Не удалось загрузить данные: {error}")
         print("Исправьте файл и повторите запуск. Данные не перезаписаны.")
@@ -177,15 +172,15 @@ def main(filename: Path = DATA_FILE) -> None:
                     sort_workshops(state["workshops"], key), state["bookings"],
                 )
             elif choice == 5:
-                booking_action(state, filename, create=False)
+                booking_action(state, directory, create=False)
             elif choice == 6:
-                booking_action(state, filename, create=True)
+                booking_action(state, directory, create=True)
             elif choice == 7:
-                cancellation_action(state, filename)
+                cancellation_action(state, directory)
             elif choice == 8:
                 show_bookings(state)
             elif choice == 9:
-                addition_action(state, filename)
+                addition_action(state, directory)
             elif choice == 10:
                 show_statistics(state)
         except ValueError as error:
