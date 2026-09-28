@@ -4,8 +4,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from bookings import cancel_booking, check_booking, create_booking
-from workshops import available_seats, filter_workshops
+from models.bookings import cancel_booking, check_booking, create_booking
+from models.workshops import available_seats, filter_workshops
 
 
 def test_create_booking_uses_one_seat(state):

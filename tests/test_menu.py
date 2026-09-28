@@ -6,7 +6,7 @@ import pytest
 
 import main
 from storage import load_state, save_state
-from workshops import available_seats
+from models.workshops import available_seats
 
 
 def feed(monkeypatch, answers):

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from workshops import add_workshop
+from models.workshops import add_workshop
 
 
 @pytest.fixture

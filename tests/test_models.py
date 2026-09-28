@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from bookings import create_booking
+from models.bookings import create_booking
 from models import Booking, Master, User, Workshop
 from storage import load_state, save_state, validate_state
 

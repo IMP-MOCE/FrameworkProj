@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from workshops import (
+from models.workshops import (
     add_workshop, filter_workshops, find_workshops, sort_workshops,
 )
 

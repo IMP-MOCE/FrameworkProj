@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
 
-from bookings import cancel_booking, check_booking, create_booking
+from models.bookings import cancel_booking, check_booking, create_booking
 from models import Booking, Workshop
 from storage import State, load_state, save_state
 from utils import confirm, input_date, input_int, input_price, input_text
-from workshops import (
+from models.workshops import (
     add_workshop, available_seats, filter_workshops, find_workshops,
     get_workshop, sort_workshops,
 )

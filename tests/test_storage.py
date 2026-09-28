@@ -5,9 +5,9 @@ import json
 import pytest
 
 import storage
-from bookings import create_booking
+from models.bookings import create_booking
 from storage import load_state, save_state
-from workshops import available_seats
+from models.workshops import available_seats
 
 
 def test_round_trip_preserves_remaining_seats(tmp_path, state):
