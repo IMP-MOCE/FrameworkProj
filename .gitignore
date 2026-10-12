@@ -1,3 +1,6 @@
 /мусор/
 /.vscode/
 __pycache__/
+*.sqlite3
+/.venv/
+/Гайд_ПР5.md
