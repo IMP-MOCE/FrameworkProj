@@ -86,11 +86,21 @@ class Workshop:
                 f"{self.date:%d.%m.%Y}; {self.price:.2f} руб.")
 
 
-def get_workshop(workshops: list[Workshop], workshop_id: int) -> Workshop:
-    """Найти занятие по ID или сообщить, что оно не найдено."""
+def find_workshop_by_id(
+    workshops: list[Workshop], workshop_id: int,
+) -> Workshop | None:
+    """Вернуть объект по ID или None для обработки отсутствия в вебе."""
     for workshop in workshops:
         if workshop.id == workshop_id:
             return workshop
+    return None
+
+
+def get_workshop(workshops: list[Workshop], workshop_id: int) -> Workshop:
+    """Найти занятие по ID или сообщить, что оно не найдено (ПР3)."""
+    workshop = find_workshop_by_id(workshops, workshop_id)
+    if workshop is not None:
+        return workshop
     raise ValueError("Занятие с таким ID не найдено.")
 
 

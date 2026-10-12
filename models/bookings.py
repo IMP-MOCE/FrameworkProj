@@ -92,6 +92,16 @@ def create_booking(
     return booking
 
 
+def find_booking_by_id(
+    bookings: list[Booking], booking_id: int,
+) -> Booking | None:
+    """Вернуть запись по ID или None, если запись отсутствует."""
+    for booking in bookings:
+        if booking.id == booking_id:
+            return booking
+    return None
+
+
 def cancel_booking(bookings: list[Booking], booking_id: int) -> Booking:
     """Найти запись и отменить её методом объекта."""
     for booking in bookings:
