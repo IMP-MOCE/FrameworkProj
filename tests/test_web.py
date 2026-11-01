@@ -1,4 +1,4 @@
-"""Проверки веб-страниц ПР5 без БД и без изменения рабочего JSON."""
+"""проверки веб-страниц ПР5-ПР6 без БД и без изменения рабочего JSON"""
 
 import os
 from datetime import date, timedelta
@@ -45,6 +45,31 @@ def test_pages_have_shared_html_and_navigation(web, url, heading):
     assert heading in text
     for link in ('href="/"', 'href="/workshops/"', 'href="/bookings/"'):
         assert link in text
+
+
+@pytest.mark.parametrize("url", [
+    "/", "/workshops/", "/workshops/1/", "/bookings/", "/bookings/1/",
+])
+def test_pages_use_base_template_and_static_files(web, url):
+    client, _, _ = web
+    text = client.get(url).content.decode()
+    assert "/static/homepage/css/style.css" in text
+    assert "/static/homepage/js/main.js" in text
+    assert "/static/homepage/img/logo.svg" in text
+    assert 'id="current-year"' in text
+
+
+def test_lists_show_count_filter(web):
+    client, _, _ = web
+    assert "Всего занятий: 1" in client.get("/workshops/").content.decode()
+    assert "Всего записей: 1" in client.get("/bookings/").content.decode()
+
+
+def test_page_function_is_removed():
+    import homepage.views
+
+    # после ПР6 html собирается только шаблонами
+    assert not hasattr(homepage.views, "page")
 
 
 def test_details_use_domain_objects_and_relations(web):

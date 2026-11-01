@@ -38,7 +38,8 @@ MIDDLEWARE = [
 ROOT_URLCONF = "creative_studio.urls"
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
-    "DIRS": [],
+    # общие шаблоны сайта: base.html и навигация
+    "DIRS": [BASE_DIR / "templates"],
     "APP_DIRS": True,
     "OPTIONS": {"context_processors": [
         "django.template.context_processors.request",

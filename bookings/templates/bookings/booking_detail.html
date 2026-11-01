@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{% if booking %}Запись №{{ booking.id }}{% else %}Запись не найдена{% endif %}{% endblock %}
+
+{% block content %}
+    {% if booking %}
+        <article class="card">
+            <div class="card-body p-4">
+                <h1>Запись №{{ booking.id }}</h1>
+                <p>{% include "bookings/includes/booking_status.html" %}</p>
+                <p>Участник: {{ booking.user.name }}</p>
+                <p>Возраст: {{ booking.user.age }} лет</p>
+                <p>
+                    Занятие:
+                    <a href="{% url 'workshops:detail' booking.workshop.id %}">{{ booking.workshop.name }}</a>
+                </p>
+                <p>Дата: {{ booking.workshop.date|date:"d.m.Y" }}</p>
+                <p>Мастер: {{ booking.workshop.master.name }}</p>
+            </div>
+        </article>
+    {% else %}
+        <h1 class="text-danger">Запись не найдена</h1>
+        <p>Записи с номером {{ booking_id }} нет.</p>
+    {% endif %}
+
+    <a class="btn btn-outline-secondary mt-3" href="{% url 'bookings:list' %}">К списку записей</a>
+{% endblock %}

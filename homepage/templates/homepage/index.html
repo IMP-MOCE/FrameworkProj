@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+    <p class="text-secondary">Творческая студия</p>
+    <h1 class="display-5">Сервис записи на творческие занятия</h1>
+    <p class="lead">
+        Рисование, керамика и работа с глиной.
+        Выберите занятие и узнайте условия участия.
+    </p>
+    <div class="d-flex gap-3 flex-wrap my-4">
+        <a class="btn btn-success" href="{% url 'workshops:list' %}">Смотреть занятия</a>
+        <a class="btn btn-outline-secondary" href="{% url 'bookings:list' %}">Открыть записи</a>
+    </div>
+    <p>
+        В каталоге указаны мастер, дата, стоимость, возрастное ограничение
+        и свободные места. В разделе записей можно посмотреть участие
+        и историю отмен.
+    </p>
+{% endblock %}

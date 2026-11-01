@@ -1,0 +1,31 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Главная{% endblock %} | Творческая студия</title>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static 'homepage/css/style.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container site-header-inner">
+            <img src="{% static 'homepage/img/logo.svg' %}"
+                 alt="Творческая студия" class="site-logo">
+            {% include "includes/navigation.html" %}
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="container site-footer">
+        <p>© <span id="current-year"></span> Творческая студия</p>
+    </footer>
+
+    <script src="{% static 'homepage/js/main.js' %}"></script>
+</body>
+</html>

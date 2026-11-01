@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{% if workshop %}{{ workshop.name }}{% else %}Занятие не найдено{% endif %}{% endblock %}
+
+{% block content %}
+    {% if workshop %}
+        <article class="card">
+            <div class="card-body p-4">
+                <h1>{{ workshop.name }}</h1>
+                <p>
+                    {% if available %}
+                        <span class="badge bg-success">Есть места</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Запись недоступна</span>
+                    {% endif %}
+                </p>
+                <p>ID: {{ workshop.id }}</p>
+                <p>Мастер: {{ workshop.master.name }}</p>
+                <p>Дата: {{ workshop.date|date:"d.m.Y" }}</p>
+                <p>Стоимость: {{ workshop.price|floatformat:"2u" }} руб.</p>
+                <p>Вместимость: {{ workshop.capacity }} мест</p>
+                <p>Свободных мест: {{ seats }}</p>
+                <p>Минимальный возраст: {{ workshop.minimum_age }} лет</p>
+            </div>
+        </article>
+    {% else %}
+        <h1 class="text-danger">Занятие не найдено</h1>
+        <p>Занятия с номером {{ workshop_id }} нет в каталоге.</p>
+    {% endif %}
+
+    <a href="{% url 'workshops:list' %}" class="btn btn-outline-secondary mt-3">К списку занятий</a>
+{% endblock %}

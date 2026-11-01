@@ -1,0 +1,85 @@
+/* общие стили сайта, раньше были внутри page() */
+body {
+    min-height: 100vh;
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    line-height: 1.6;
+    color: #25342f;
+    background: #f5f6f2;
+}
+
+a {
+    color: #285d49;
+}
+
+h1 {
+    margin-bottom: 24px;
+}
+
+.container {
+    max-width: 960px;
+    margin: auto;
+    padding: 24px;
+}
+
+/* шапка с логотипом и навигацией */
+.site-header {
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+}
+
+.site-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+}
+
+.site-logo {
+    width: 48px;
+    height: auto;
+}
+
+.site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.site-nav a {
+    color: #285d49;
+    text-decoration: none;
+}
+
+.site-nav a:hover {
+    text-decoration: underline;
+}
+
+.card {
+    border-radius: 12px;
+    background: #fff;
+}
+
+/* карточка занятия в каталоге */
+.workshop-card {
+    border-left: 4px solid #285d49;
+}
+
+.workshop-card .card-title a {
+    text-decoration: none;
+}
+
+/* статус записи */
+.booking-status {
+    font-weight: 600;
+}
+
+.booking-status-cancelled {
+    text-decoration: line-through;
+}
+
+.site-footer {
+    color: #6c757d;
+    font-size: 0.9rem;
+}

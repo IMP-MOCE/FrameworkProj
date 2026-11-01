@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Записи{% endblock %}
+
+{% block content %}
+    <h1>Записи на занятия</h1>
+    <p class="text-secondary">Всего записей: {{ bookings|length }}</p>
+
+    <ul class="list-group">
+        {% for booking in bookings %}
+            <li class="list-group-item py-3">
+                <a href="{% url 'bookings:detail' booking.id %}">
+                    Запись №{{ booking.id }}: {{ booking.workshop.name }}
+                </a>
+                {% include "bookings/includes/booking_status.html" %}
+                <div class="text-secondary">
+                    {{ booking.user.name }} · {{ booking.workshop.date|date:"d.m.Y" }}
+                </div>
+            </li>
+        {% empty %}
+            <li class="list-group-item">Записей нет.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}
