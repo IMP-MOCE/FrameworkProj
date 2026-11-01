@@ -1,4 +1,4 @@
-"""проверки веб-страниц ПР5-ПР6 без БД и без изменения рабочего JSON"""
+"""проверки веб-страниц ПР5-ПР7 на временных JSON и временной базе SQLite"""
 
 import os
 from datetime import date, timedelta
@@ -8,6 +8,8 @@ import pytest
 from django.test import Client, override_settings
 from django.urls import Resolver404, resolve, reverse
 
+from db import database
+from db.import_json import import_data
 from models.bookings import create_booking, find_booking_by_id
 from models.workshops import find_workshop_by_id
 from storage import save_state
@@ -16,12 +18,20 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "creative_studio.settings")
 django.setup()
 
 
+def reimport(directory):
+    """перенести изменённый JSON во временную базу"""
+    import_data(directory, directory / "studio.sqlite")
+
+
 @pytest.fixture
-def web(tmp_path, state):
+def web(tmp_path, state, monkeypatch):
     """Загрузить независимые JSON через те же функции, что и консоль."""
     save_state(tmp_path, state, "workshops")
     create_booking(state["workshops"], state["bookings"], 1, "Мария", 18)
     save_state(tmp_path, state, "bookings")
+    reimport(tmp_path)
+    # представления читают временную базу, а не data/studio.sqlite
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "studio.sqlite")
     with override_settings(DATA_DIR=tmp_path, DEBUG=False):
         yield Client(HTTP_HOST="localhost"), tmp_path, state
 
@@ -132,6 +142,8 @@ def test_json_change_appears_on_next_request_and_is_escaped(web):
     save_state(directory, state, "bookings")
     state["workshops"][0].name = '<script>alert("test")</script>'
     save_state(directory, state, "workshops")
+    # каталог читает SQLite, поэтому изменения JSON нужно перенести
+    reimport(directory)
     for url in ("/workshops/", "/workshops/1/"):
         text = client.get(url).content.decode()
         assert "&lt;script&gt;" in text
@@ -139,11 +151,20 @@ def test_json_change_appears_on_next_request_and_is_escaped(web):
         assert "Роспись кружки" not in text
 
 
-def test_empty_json_has_readable_lists(web, tmp_path):
+def test_empty_json_has_readable_lists(web, tmp_path, monkeypatch):
     client, _, _ = web
-    with override_settings(DATA_DIR=tmp_path / "empty"):
-        assert "Занятий нет." in client.get("/workshops/").content.decode()
-        assert "Записей нет." in client.get("/bookings/").content.decode()
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    reimport(empty)
+    monkeypatch.setattr(database, "DB_PATH", empty / "studio.sqlite")
+    assert "Занятий нет." in client.get("/workshops/").content.decode()
+    assert "Записей нет." in client.get("/bookings/").content.decode()
+    assert "Мастеров нет." in (
+        client.get("/workshops/masters/").content.decode()
+    )
+    statistics = client.get("/bookings/statistics/").content.decode()
+    assert "Всего занятий: 0" in statistics
+    assert "Выручка по активным записям: 0.00 руб." in statistics
 
 
 def test_expired_and_full_workshops_are_unavailable(web):
@@ -166,6 +187,7 @@ def test_cancelled_booking_is_shown_and_releases_seat(web):
     client, directory, state = web
     state["bookings"][0].cancel()
     save_state(directory, state, "bookings")
+    reimport(directory)
     for url in ("/bookings/", "/bookings/1/"):
         assert "Отменена" in client.get(url).content.decode()
     assert "Свободных мест: 2" in (
@@ -175,6 +197,7 @@ def test_cancelled_booking_is_shown_and_releases_seat(web):
 
 @pytest.mark.parametrize("url", [
     "/", "/workshops/", "/workshops/1/", "/bookings/", "/bookings/1/",
+    "/workshops/available/", "/workshops/masters/", "/bookings/statistics/",
 ])
 def test_web_is_read_only_and_supports_head(web, url):
     client, directory, _ = web
@@ -188,3 +211,74 @@ def test_web_is_read_only_and_supports_head(web, url):
     assert post.status_code == 405
     assert post["Allow"] == "GET, HEAD"
     assert [file.read_bytes() for file in files] == before
+
+
+def test_available_search_uses_date_age_and_free_seats(web):
+    client, directory, state = web
+    day = state["workshops"][0].date.isoformat()
+    url = "/workshops/available/"
+    found = client.get(url, {"date": day, "age": 18}).content.decode()
+    assert "Найдено занятий: 1" in found
+    assert "Свободных мест: 1" in found
+    too_young = client.get(url, {"date": day, "age": 10}).content.decode()
+    assert "Найдено занятий: 0" in too_young
+
+    # второе место занято: HAVING убирает занятие из результата
+    create_booking(state["workshops"], state["bookings"], 1, "Олег", 20)
+    save_state(directory, state, "bookings")
+    reimport(directory)
+    full = client.get(url, {"date": day, "age": 18}).content.decode()
+    assert "Найдено занятий: 0" in full
+
+
+@pytest.mark.parametrize("params", [
+    {"date": "2026-13-01", "age": "18"},
+    {"date": "2026-10-10", "age": "abc"},
+    {"date": "2026-10-10", "age": "121"},
+    {"date": "' OR 1=1 --", "age": "18"},
+])
+def test_available_search_rejects_wrong_input(web, params):
+    client, _, _ = web
+    response = client.get("/workshops/available/", params)
+    assert response.status_code == 200
+    assert "Укажите дату и возраст" in response.content.decode()
+
+
+def test_available_search_without_params_shows_only_form(web):
+    client, _, _ = web
+    text = client.get("/workshops/available/").content.decode()
+    assert '<input type="date"' in text
+    assert "Найдено занятий" not in text
+
+
+def test_masters_page_links_to_filtered_catalog(web):
+    client, _, _ = web
+    masters = client.get("/workshops/masters/").content.decode()
+    assert 'href="/workshops/?master=1"' in masters
+    assert "1500.00 руб." in masters
+    catalog = client.get("/workshops/", {"master": 1}).content.decode()
+    assert "Занятия мастера Анна" in catalog
+    assert "Роспись кружки" in catalog
+    # неизвестный мастер: показывается весь каталог
+    other = client.get("/workshops/", {"master": 999}).content.decode()
+    assert "Творческие занятия" in other
+
+
+def test_statistics_counts_from_database(web):
+    client, directory, state = web
+    create_booking(state["workshops"], state["bookings"], 1, "Олег", 20)
+    state["bookings"][0].cancel()
+    save_state(directory, state, "bookings")
+    reimport(directory)
+    text = client.get("/bookings/statistics/").content.decode()
+    assert "Всего занятий: 1" in text
+    assert "Активные:" in text and "Отменённые:" in text
+    assert "Выручка по активным записям: 1500.00 руб." in text
+    assert "Таких занятий пока нет." in text
+
+
+def test_navigation_has_new_sections(web):
+    client, _, _ = web
+    text = client.get("/").content.decode()
+    assert 'href="/workshops/masters/"' in text
+    assert 'href="/bookings/statistics/"' in text

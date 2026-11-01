@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика{% endblock %}
+
+{% block content %}
+    <h1>Статистика</h1>
+
+    <section class="mb-4">
+        <h2 class="h4">Каталог</h2>
+        <p>Всего занятий: {{ catalog.workshops_count }}</p>
+        {% if catalog.workshops_count %}
+            <p>
+                Цена: от {{ catalog.min_price|floatformat:"2u" }}
+                до {{ catalog.max_price|floatformat:"2u" }} руб.,
+                в среднем {{ catalog.average_price|floatformat:"2u" }} руб.
+            </p>
+        {% endif %}
+    </section>
+
+    <section class="mb-4">
+        <h2 class="h4">Записи по статусам</h2>
+        <ul>
+            {% for item in statuses %}
+                <li>
+                    {% if item.status == "active" %}Активные{% else %}Отменённые{% endif %}:
+                    {{ item.bookings_count }}
+                </li>
+            {% empty %}
+                <li>Записей нет.</li>
+            {% endfor %}
+        </ul>
+        <p>Выручка по активным записям: {{ revenue.total|default:0|floatformat:"2u" }} руб.</p>
+    </section>
+
+    <section class="mb-4">
+        <h2 class="h4">Участники</h2>
+        <table class="table bg-white">
+            <thead>
+                <tr>
+                    <th>Участник</th>
+                    <th>Возраст</th>
+                    <th>Активных записей</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.age }}</td>
+                        <td>{{ user.active_count }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">Участников нет.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="mb-4">
+        <h2 class="h4">Популярные занятия (от {{ popular_min }} активных записей)</h2>
+        <ul>
+            {% for item in popular %}
+                <li>{{ item.name }}: {{ item.active_count }}</li>
+            {% empty %}
+                <li>Таких занятий пока нет.</li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endblock %}

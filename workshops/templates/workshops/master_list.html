@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Мастера{% endblock %}
+
+{% block content %}
+    <h1>Мастера</h1>
+
+    <table class="table bg-white">
+        <thead>
+            <tr>
+                <th>Мастер</th>
+                <th>Занятий</th>
+                <th>Средняя цена</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for master in masters %}
+                <tr>
+                    <td><a href="{% url 'workshops:list' %}?master={{ master.id }}">{{ master.name }}</a></td>
+                    <td>{{ master.workshops_count }}</td>
+                    <td>{{ master.average_price|default:0|floatformat:"2u" }} руб.</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="3">Мастеров нет.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

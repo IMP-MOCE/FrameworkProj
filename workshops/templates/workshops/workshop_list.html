@@ -3,11 +3,20 @@
 {% block title %}Занятия{% endblock %}
 
 {% block content %}
-    <h1>Творческие занятия</h1>
-    <p>Откройте занятие, чтобы посмотреть мастера и условия участия.</p>
+    {% if master %}
+        <h1>Занятия мастера {{ master.name }}</h1>
+        <p><a href="{% url 'workshops:list' %}">Показать все занятия</a></p>
+    {% else %}
+        <h1>Творческие занятия</h1>
+        <p>Откройте занятие, чтобы посмотреть мастера и условия участия.</p>
+    {% endif %}
+
+    <p>
+        <a class="btn btn-success" href="{% url 'workshops:available' %}">Найти свободное занятие</a>
+    </p>
     <p class="text-secondary">Всего занятий: {{ workshops|length }}</p>
 
-    {% for workshop, seats in workshops %}
+    {% for workshop in workshops %}
         {% include "workshops/includes/workshop_card.html" %}
     {% empty %}
         <p>Занятий нет.</p>

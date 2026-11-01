@@ -10,11 +10,11 @@
         {% for booking in bookings %}
             <li class="list-group-item py-3">
                 <a href="{% url 'bookings:detail' booking.id %}">
-                    Запись №{{ booking.id }}: {{ booking.workshop.name }}
+                    Запись №{{ booking.id }}: {{ booking.workshop_name }}
                 </a>
                 {% include "bookings/includes/booking_status.html" %}
                 <div class="text-secondary">
-                    {{ booking.user.name }} · {{ booking.workshop.date|date:"d.m.Y" }}
+                    {{ booking.user_name }} · {{ booking.workshop_date }}
                 </div>
             </li>
         {% empty %}
