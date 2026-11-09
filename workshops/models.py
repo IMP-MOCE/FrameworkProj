@@ -67,4 +67,6 @@ class Workshop(models.Model):
         if self.minimum_age is not None and self.bookings.filter(
             user__age__lt=self.minimum_age,
         ).exists():
-            raise ValidationError("На занятие записаны участники младше порога.")
+            raise ValidationError(
+                "На занятие записаны участники младше порога.",
+            )
