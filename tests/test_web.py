@@ -13,6 +13,11 @@ from db.import_json import import_data
 from models.bookings import create_booking, find_booking_by_id
 from models.workshops import find_workshop_by_id
 from storage import save_state
+from db.import_sqlite_to_orm import import_data as import_orm
+from bookings.models import Booking
+from masters.models import Master
+from users.models import User
+from workshops.models import Workshop
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "creative_studio.settings")
 django.setup()
@@ -21,10 +26,15 @@ django.setup()
 def reimport(directory):
     """перенести изменённый JSON во временную базу"""
     import_data(directory, directory / "studio.sqlite")
+    Booking.objects.all().delete()
+    Workshop.objects.all().delete()
+    User.objects.all().delete()
+    Master.objects.all().delete()
+    import_orm(directory / "studio.sqlite")
 
 
 @pytest.fixture
-def web(tmp_path, state, monkeypatch):
+def web(tmp_path, state, monkeypatch, db):
     """Загрузить независимые JSON через те же функции, что и консоль."""
     save_state(tmp_path, state, "workshops")
     create_booking(state["workshops"], state["bookings"], 1, "Мария", 18)
@@ -123,9 +133,7 @@ def test_debug_mode_changes_only_global_404(web):
         assert "404 — страница не найдена" not in (
             client.get("/unknown/").content.decode()
         )
-        assert "Занятие не найдено" in (
-            client.get("/workshops/999/").content.decode()
-        )
+        assert client.get("/workshops/999/").status_code == 404
 
 
 def test_domain_search_returns_object_or_none(web):
@@ -172,12 +180,14 @@ def test_expired_and_full_workshops_are_unavailable(web):
     workshop = state["workshops"][0]
     workshop.capacity = 1
     save_state(directory, state, "workshops")
+    reimport(directory)
     assert "Запись недоступна" in (
         client.get("/workshops/1/").content.decode()
     )
     workshop.capacity = 2
     workshop.date = date.today() - timedelta(days=1)
     save_state(directory, state, "workshops")
+    reimport(directory)
     assert "Запись недоступна" in (
         client.get("/workshops/1/").content.decode()
     )

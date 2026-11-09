@@ -1,6 +1,7 @@
 """Локальные настройки веб-версии сервиса творческих занятий."""
 
 import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,6 +24,8 @@ INSTALLED_APPS = [
     "homepage.apps.HomepageConfig",
     "workshops.apps.WorkshopsConfig",
     "bookings.apps.BookingsConfig",
+    "masters.apps.MastersConfig",
+    "users.apps.UsersConfig",
 ]
 
 MIDDLEWARE = [
@@ -50,8 +53,7 @@ TEMPLATES = [{
 WSGI_APPLICATION = "creative_studio.wsgi.application"
 ASGI_APPLICATION = "creative_studio.asgi.application"
 
-# SQLite пока используется только встроенными приложениями Django.
-# Занятия и записи продолжают загружаться из JSON средствами ПР3.
+# Целевая база ORM, данные ПР7 импортируются из data/studio.sqlite.
 DATABASES = {"default": {
     "ENGINE": "django.db.backends.sqlite3",
     "NAME": BASE_DIR / "db.sqlite3",
@@ -63,3 +65,10 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
+BOOKINGS_PAGE_SIZE = 10
+if DEBUG and not TESTING:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
+INTERNAL_IPS = ["127.0.0.1", "::1"]

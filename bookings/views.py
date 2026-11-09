@@ -1,115 +1,115 @@
-"""страницы записей: список и статистика из SQLite, запись из JSON"""
+"""Записи, фильтрация, пагинация и статистика средствами ORM."""
+
+from datetime import date
+from re import escape
 
 from django.conf import settings
+from django.core.paginator import Paginator
+from django.db.models import Avg, Count, F, Max, Min, Q, Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_safe
 
-from db.database import fetch_all, fetch_one
-from models.bookings import find_booking_by_id
-from storage import load_state
-
-# все записи с названием занятия и именем участника из трёх таблиц
-BOOKINGS_QUERY = """
-    SELECT
-        bookings.id,
-        bookings.status,
-        workshops.name AS workshop_name,
-        strftime('%d.%m.%Y', workshops.date) AS workshop_date,
-        users.name AS user_name
-    FROM bookings
-    JOIN workshops ON bookings.workshop_id = workshops.id
-    JOIN users ON bookings.user_id = users.id
-    ORDER BY bookings.id
-"""
-
-CATALOG_SUMMARY_QUERY = """
-    SELECT
-        COUNT(*) AS workshops_count,
-        MIN(price) AS min_price,
-        MAX(price) AS max_price,
-        AVG(price) AS average_price
-    FROM workshops
-"""
-
-STATUS_QUERY = """
-    SELECT status, COUNT(*) AS bookings_count
-    FROM bookings
-    GROUP BY status
-    ORDER BY status
-"""
-
-REVENUE_QUERY = """
-    SELECT SUM(workshops.price) AS total
-    FROM bookings
-    JOIN workshops ON bookings.workshop_id = workshops.id
-    WHERE bookings.status = 'active'
-"""
-
-USERS_QUERY = """
-    SELECT
-        users.name,
-        users.age,
-        COUNT(bookings.id) AS active_count
-    FROM users
-    LEFT JOIN bookings
-        ON bookings.user_id = users.id
-        AND bookings.status = 'active'
-    GROUP BY users.id
-    ORDER BY active_count DESC, users.name
-"""
-
-# занятия, у которых активных записей не меньше заданного числа
-POPULAR_QUERY = """
-    SELECT
-        workshops.name,
-        COUNT(bookings.id) AS active_count
-    FROM workshops
-    JOIN bookings ON bookings.workshop_id = workshops.id
-    WHERE bookings.status = 'active'
-    GROUP BY workshops.id
-    HAVING COUNT(bookings.id) >= ?
-    ORDER BY active_count DESC
-"""
+from users.models import User
+from workshops.models import Workshop
+from .models import Booking
 
 POPULAR_MIN_BOOKINGS = 2
+SORTS = {
+    "date": ("workshop__date", "pk"),
+    "-date": ("-workshop__date", "pk"),
+    "workshop": ("workshop__name", "pk"),
+    "user": ("user__name", "pk"),
+}
 
 
 @require_safe
 def booking_list(request: HttpRequest) -> HttpResponse:
-    """передать в шаблон активные и отменённые записи"""
-    context = {
-        "bookings": fetch_all(BOOKINGS_QUERY),
-    }
-    return render(request, "bookings/booking_list.html", context)
+    bookings = Booking.objects.all()
+    errors = []
+    for parameter in ("workshop", "user"):
+        value = request.GET.get(parameter, "")
+        if value:
+            if value.isdecimal() and len(value) < 19 and int(value) > 0:
+                bookings = bookings.filter(**{f"{parameter}_id": int(value)})
+            else:
+                errors.append(
+                    "Укажите корректный номер занятия или участника.",
+                )
+    date_text = request.GET.get("date", "")
+    if date_text:
+        try:
+            day = date.fromisoformat(date_text)
+        except ValueError:
+            errors.append("Укажите корректную дату.")
+        else:
+            bookings = bookings.filter(workshop__date=day)
+    status = request.GET.get("status", "")
+    if status == "active":
+        bookings = bookings.exclude(status=Booking.Status.CANCELLED)
+    elif status == "cancelled":
+        bookings = bookings.filter(status=Booking.Status.CANCELLED)
+    elif status:
+        errors.append("Выберите корректный статус.")
+    query = request.GET.get("q", "").strip()
+    if query:
+        bookings = bookings.filter(
+            Q(workshop__name__iregex=escape(query))
+            | Q(user__name__iregex=escape(query)),
+        )
+    if errors:
+        bookings = bookings.none()
+    sort = request.GET.get("sort", "date")
+    if sort not in SORTS:
+        sort = "date"
+    # values возвращает словари, F задаёт понятные шаблону имена полей.
+    rows = bookings.order_by(*SORTS[sort]).annotate(
+        workshop_name=F("workshop__name"), user_name=F("user__name"),
+        workshop_date=F("workshop__date"),
+    ).values("id", "status", "workshop_name", "user_name", "workshop_date")
+    page_obj = Paginator(rows, settings.BOOKINGS_PAGE_SIZE).get_page(
+        request.GET.get("page"),
+    )
+    return render(request, "bookings/booking_list.html", {
+        "bookings": page_obj, "page_obj": page_obj, "errors": errors,
+        "workshops": Workshop.objects.all(), "users": User.objects.all(),
+        "filters": request.GET, "sort": sort, "query": query,
+    })
 
 
 @require_safe
 def statistics(request: HttpRequest) -> HttpResponse:
-    """сводка по каталогу, записям и участникам"""
-    context = {
-        "catalog": fetch_one(CATALOG_SUMMARY_QUERY),
-        "statuses": fetch_all(STATUS_QUERY),
-        "revenue": fetch_one(REVENUE_QUERY),
-        "users": fetch_all(USERS_QUERY),
-        "popular": fetch_all(POPULAR_QUERY, [POPULAR_MIN_BOOKINGS]),
+    catalog = Workshop.objects.aggregate(
+        workshops_count=Count("pk"), min_price=Min("price"),
+        max_price=Max("price"), average_price=Avg("price"),
+    )
+    statuses = Booking.objects.order_by("status").values("status").annotate(
+        bookings_count=Count("pk"),
+    )
+    revenue = Booking.objects.exclude(status="cancelled").aggregate(
+        total=Sum("workshop__price"),
+    )
+    users = User.objects.annotate(
+        active_count=Count(
+            "bookings", filter=Q(bookings__status="active"),
+        ),
+    ).order_by("-active_count", "name", "pk")
+    popular = Workshop.objects.with_seats().filter(
+        active_count__gte=POPULAR_MIN_BOOKINGS,
+    ).order_by("-active_count", "name", "pk")
+    return render(request, "bookings/statistics.html", {
+        "catalog": catalog, "statuses": statuses, "revenue": revenue,
+        "users": users, "popular": popular,
         "popular_min": POPULAR_MIN_BOOKINGS,
-    }
-    return render(request, "bookings/statistics.html", context)
+    })
 
 
 @require_safe
 def booking_detail(request: HttpRequest, booking_id: int) -> HttpResponse:
-    """показать запись, если её нет, вернуть 404"""
-    state = load_state(settings.DATA_DIR)
-    booking = find_booking_by_id(state["bookings"], booking_id)
-    context = {
-        "booking": booking,
-        "booking_id": booking_id,
-    }
-    return render(
-        request,
-        "bookings/booking_detail.html",
-        context,
-        status=404 if booking is None else 200,
+    booking = get_object_or_404(
+        Booking.objects.select_related("workshop__master", "user"),
+        pk=booking_id,
     )
+    return render(request, "bookings/booking_detail.html", {
+        "booking": booking,
+    })

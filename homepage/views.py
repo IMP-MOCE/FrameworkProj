@@ -15,4 +15,14 @@ def page_not_found(
     request: HttpRequest, exception: Exception,
 ) -> HttpResponse:
     """обработать неизвестный адрес при DEBUG=False"""
+    match = request.resolver_match
+    if match is not None and match.url_name == "detail":
+        if match.namespace == "workshops":
+            return render(request, "workshops/workshop_detail.html", {
+                "workshop_id": match.kwargs["workshop_id"],
+            }, status=404)
+        if match.namespace == "bookings":
+            return render(request, "bookings/booking_detail.html", {
+                "booking_id": match.kwargs["booking_id"],
+            }, status=404)
     return render(request, "homepage/page_not_found.html", status=404)

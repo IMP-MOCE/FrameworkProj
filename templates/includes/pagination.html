@@ -1,0 +1,11 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3 d-flex gap-3" aria-label="Страницы записей">
+    {% if page_obj.has_previous %}
+        <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+    {% endif %}
+    <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+        <a href="{% querystring page=page_obj.next_page_number %}">Далее</a>
+    {% endif %}
+</nav>
+{% endif %}

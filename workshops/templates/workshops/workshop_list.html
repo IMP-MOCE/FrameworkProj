@@ -14,6 +14,17 @@
     <p>
         <a class="btn btn-success" href="{% url 'workshops:available' %}">Найти свободное занятие</a>
     </p>
+    <form method="get" class="d-flex gap-2 mb-3 flex-wrap">
+        {% if master %}<input type="hidden" name="master" value="{{ master.id }}">{% endif %}
+        <input name="q" value="{{ query }}" class="form-control w-auto" placeholder="Название занятия" aria-label="Название занятия">
+        <select name="sort" class="form-select w-auto" aria-label="Сортировка">
+            <option value="date" {% if sort == 'date' %}selected{% endif %}>По дате</option>
+            <option value="name" {% if sort == 'name' %}selected{% endif %}>По названию</option>
+            <option value="price" {% if sort == 'price' %}selected{% endif %}>Сначала дешевле</option>
+            <option value="-price" {% if sort == '-price' %}selected{% endif %}>Сначала дороже</option>
+        </select>
+        <button class="btn btn-success">Найти</button>
+    </form>
     <p class="text-secondary">Всего занятий: {{ workshops|length }}</p>
 
     {% for workshop in workshops %}

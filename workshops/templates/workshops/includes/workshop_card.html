@@ -4,7 +4,7 @@
             <a href="{% url 'workshops:detail' workshop.id %}">{{ workshop.name|default:"Без названия" }}</a>
         </h2>
         <p class="card-text text-secondary">
-            {{ workshop.date_text }} · {{ workshop.price|floatformat:"2u" }} руб.
+            {{ workshop.date|date:"d.m.Y" }} · {{ workshop.price|floatformat:"2u" }} руб.
             · Свободных мест: {{ workshop.seats }}
         </p>
     </div>

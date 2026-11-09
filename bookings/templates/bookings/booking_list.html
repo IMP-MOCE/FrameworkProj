@@ -4,7 +4,49 @@
 
 {% block content %}
     <h1>Записи на занятия</h1>
-    <p class="text-secondary">Всего записей: {{ bookings|length }}</p>
+    <form method="get" class="row g-2 mb-4">
+        <div class="col-sm-6"><label for="q" class="form-label">Занятие или участник</label>
+            <input id="q" name="q" value="{{ query }}" class="form-control"></div>
+        <div class="col-sm-6"><label for="date" class="form-label">Дата занятия</label>
+            <input id="date" name="date" type="date" value="{{ filters.date }}" class="form-control"></div>
+        <div class="col-sm-6"><label for="workshop" class="form-label">Занятие</label>
+            <select id="workshop" name="workshop" class="form-select">
+                <option value="">Все занятия</option>
+                {% for item in workshops %}
+                    <option value="{{ item.id }}"
+                        {% if filters.workshop == item.id|stringformat:'s' %}selected{% endif %}>
+                        {{ item.name }}
+                    </option>
+                {% endfor %}
+            </select></div>
+        <div class="col-sm-6"><label for="user" class="form-label">Участник</label>
+            <select id="user" name="user" class="form-select">
+                <option value="">Все участники</option>
+                {% for item in users %}
+                    <option value="{{ item.id }}"
+                        {% if filters.user == item.id|stringformat:'s' %}selected{% endif %}>
+                        {{ item.name }}
+                    </option>
+                {% endfor %}
+            </select></div>
+        <div class="col-sm-6"><label for="status" class="form-label">Статус</label>
+            <select id="status" name="status" class="form-select">
+                <option value="">Все статусы</option>
+                <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Активные</option>
+                <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Отменённые</option>
+            </select></div>
+        <div class="col-sm-6"><label for="sort" class="form-label">Сортировка</label>
+            <select id="sort" name="sort" class="form-select">
+                <option value="date" {% if sort == 'date' %}selected{% endif %}>Сначала ранние</option>
+                <option value="-date" {% if sort == '-date' %}selected{% endif %}>Сначала поздние</option>
+                <option value="workshop" {% if sort == 'workshop' %}selected{% endif %}>По занятию</option>
+                <option value="user" {% if sort == 'user' %}selected{% endif %}>По участнику</option>
+            </select></div>
+        <div class="col-12"><button class="btn btn-success">Применить</button>
+            <a href="{% url 'bookings:list' %}" class="btn btn-outline-secondary">Сбросить</a></div>
+    </form>
+    {% for error in errors %}<p class="text-danger" role="alert">{{ error }}</p>{% endfor %}
+    <p class="text-secondary">Всего записей: {{ page_obj.paginator.count }}</p>
 
     <ul class="list-group">
         {% for booking in bookings %}
@@ -14,11 +56,12 @@
                 </a>
                 {% include "bookings/includes/booking_status.html" %}
                 <div class="text-secondary">
-                    {{ booking.user_name }} · {{ booking.workshop_date }}
+                    {{ booking.user_name }} · {{ booking.workshop_date|date:"d.m.Y" }}
                 </div>
             </li>
         {% empty %}
             <li class="list-group-item">Записей нет.</li>
         {% endfor %}
     </ul>
+    {% include "includes/pagination.html" %}
 {% endblock %}
